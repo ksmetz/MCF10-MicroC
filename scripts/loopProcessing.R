@@ -11,13 +11,13 @@ library(scales)
 # READ IN     -----------------------------------------------------------------------------
 
 ## Loops
-# Comprehensive
-celldir = "./input/loops/celltype/comprehensive//"
-megadir = "./input/loops/mega/comprehensive/mega_loops.txt"
+# # Comprehensive
+# celldir = "./input/loops/celltype/comprehensive//"
+# megadir = "./input/loops/mega/comprehensive/mega_loops.txt"
 
-# # Conservativec
-# celldir = "./input/loops/celltype/conservative/"
-# megadir = "./input/loops/mega/conservative/mega_loops.txt"
+# Conservative
+celldir = "./input/loops/celltype/conservative/"
+megadir = "./input/loops/mega/conservative/mega_loops.txt"
 
 loopFiles = list.files(celldir,  
                        pattern = "*loops.txt", 
@@ -372,8 +372,8 @@ dev.off()
 
 
 ## OUTPUT  -----
-save(loops, countMatrix, dds, dds.trans, diffLoops, allSig,
-     file = "./output/loopProcessing/MCF10_processedLoops-comprehensive.rda")
-
 # save(loops, countMatrix, dds, dds.trans, diffLoops, allSig,
-#      file = "./output/loopProcessing/MCF10_processedLoops-conservative.rda")
+#      file = "./output/loopProcessing/MCF10_processedLoops-comprehensive.rda")
+
+save(loops, countMatrix, dds, dds.trans, diffLoops, allSig,
+     file = "./output/loopProcessing/MCF10_processedLoops-conservative.rda")
