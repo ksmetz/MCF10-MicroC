@@ -1,0 +1,1 @@
+java -jar SIP_HiC.jar hic /data/reedks/projects/MCF10/mega/MicroC/output/MCF10/MCF10_merged_map.hic /data/reedks/data/ref/hg38/hg38.chrom.sizes.abridged ./comprehensive /data/reedks/tools/juicer_tools_1.13.02.jar -norm SCALE -g 1.0 -min 2.0 -max 2.0 -mat 2000 -d 6 -res 5000 -sat 0.01 -t 2800 -nbZero 6 -factor 2 -fdr 0.05 -del true -cpu 1 -isDroso false
