@@ -2,4 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
-inputFiles
+input
+output/abcProcessing/abcAll.rds
+output/abcProcessing/diffContactObjects.rda
