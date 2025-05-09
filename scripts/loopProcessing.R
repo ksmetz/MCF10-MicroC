@@ -1,23 +1,21 @@
 
-# INITIALIZE  -----------------------------------------------------------------------------
+# INITIALIZE  ---------------------------------------------
 
 library(mariner)
 library(DESeq2)
 library(InteractionSet)
 library(scales)
+library(RColorBrewer)
+library(colorspace)
+library(pheatmap)
 
 
 
-# READ IN     -----------------------------------------------------------------------------
+# READ IN     ---------------------------------------------
 
-## Loops
-# # Comprehensive
-# celldir = "./input/loops/celltype/comprehensive//"
-# megadir = "./input/loops/mega/comprehensive/mega_loops.txt"
-
-# Conservative
-celldir = "./input/loops/celltype/conservative/"
-megadir = "./input/loops/mega/conservative/mega_loops.txt"
+## Loop calls -------
+celldir = "./input/loops/celltype/"
+megadir = "./input/loops/mega/mega_loops.txt"
 
 loopFiles = list.files(celldir,  
                        pattern = "*loops.txt", 
@@ -30,16 +28,19 @@ loopSets = lapply(loopFiles, read.table, header = T)
 loopsGR = lapply(loopSets, as_ginteractions)
 
 
-## Tech rep hic files (for counts)
+## Tech rep hic files -------
 trHicPaths = list.files("/Volumes/MCF10/CantataData/proc/techrep/hicFiles/",
                         full.names = T)
 trHicPaths = trHicPaths[c(1:8, 17:24, 9:16)]
 
 
+## Denylist -------
+deny = readRDS("./output/denyList/denylist.rds")
 
-# RUN     -----------------------------------------------------------------------------
 
-## MERGING LOOPS ---------
+
+# MERGING LOOPS     ------------------------------------------------------
+
 ## Bin to 10kb
 loops10k = lapply(loopsGR, assignToBins, binSize = 10000)
 
@@ -66,8 +67,13 @@ mergedLoops = aggMetadata(mergedLoops,
                           columns = "APScoreAvg", 
                           funs = "mean")
 
+## Remove loops in denylist regions (29,627 --> 29,205)
+ov = findOverlaps(query = mergedLoops,
+                  subject = deny)
+mergedLoops = mergedLoops[-(unique(queryHits(ov))),]
 
-## PULL COUNTS ---------
+
+# PULL COUNTS     ------------------------------------------------------
 # Read in counts from hic files; runs in ~6m
 counts = pullHicPixels(x = mergedLoops, 
                        files = trHicPaths, 
@@ -75,7 +81,7 @@ counts = pullHicPixels(x = mergedLoops,
                        norm = "NONE")
 
 
-## DIFFERENTIAL ANALYSIS ---------
+# DIFFERENTIAL ANALYSIS     ------------------------------------------------------
 # Pull count matrix for DESeq
 countMatrix=counts(counts)
 countMatrix=suppressWarnings(apply(countMatrix, 2, as.numeric))
@@ -85,14 +91,46 @@ rownames(countMatrix) = paste0("loop_", 1:nrow(countMatrix))
 loops = as.data.frame(mergedLoops)
 dnacopy <- matrix(1, nrow=nrow(countMatrix), ncol=ncol(countMatrix))
 
-dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 143200000,  1:8] <- 1.5
-dnacopy[loops$seqnames1 == "chr8" & loops$start1 >= 54600000,  1:8] <- 1.4
-dnacopy[loops$seqnames1 == "chr9" & loops$end1 <= 39000000,  1:8] <- 0.75
-dnacopy[loops$seqnames1 == "chr20", 9:16] <- 1.4
-dnacopy[loops$seqnames1 == "chr3" & loops$start1 >= 94000000,  17:24] <- 1.4
-dnacopy[loops$seqnames1 == "chr9" & loops$end1 <= 39000000,  17:24] <- 1.3
-dnacopy[loops$seqnames1 == "chr9" & loops$start1 >= 65000000,  17:24] <- 1.5
+# Note: Based on readouts from NeoLoopFinder CNV
+dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 143200000,  1:8] <- 1.39
+dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 143200000,  9:16] <- 0.96
+dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 143200000,  17:24] <- 0.93
+
+dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 201000000,  1:8] <- 1.62
+dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 201000000,  9:16] <- 0.87
+dnacopy[loops$seqnames1 == "chr1" & loops$start1 >= 201000000,  17:24] <- 0.86
+
+dnacopy[loops$seqnames1 == "chr3" & loops$start1 >= 69000000,  1:8] <- 0.98
+dnacopy[loops$seqnames1 == "chr3" & loops$start1 >= 69000000,  9:16] <- 0.93
+dnacopy[loops$seqnames1 == "chr3" & loops$start1 >= 69000000,  17:24] <- 1.44
+
+dnacopy[loops$seqnames1 == "chr8" & loops$start1 >= 99000000,  1:8] <- 1.56
+dnacopy[loops$seqnames1 == "chr8" & loops$start1 >= 99000000,  9:16] <- 0.92
+dnacopy[loops$seqnames1 == "chr8" & loops$start1 >= 99000000,  17:24] <- 0.94
+
+dnacopy[loops$seqnames1 == "chr9" & loops$end1 <= 39000000,  1:8] <- 0.82
+dnacopy[loops$seqnames1 == "chr9" & loops$end1 <= 39000000,  9:16] <- 1.11
+dnacopy[loops$seqnames1 == "chr9" & loops$end1 <= 39000000,  17:24] <- 1.49
+
+dnacopy[loops$seqnames1 == "chr9" & loops$start1 >= 65000000,  1:8] <- 0.95
+dnacopy[loops$seqnames1 == "chr9" & loops$start1 >= 65000000,  9:16] <- 1.02
+dnacopy[loops$seqnames1 == "chr9" & loops$start1 >= 65000000,  17:24] <- 1.35
+
+dnacopy[loops$seqnames1 == "chr10", 1:8] <- 1.04
+dnacopy[loops$seqnames1 == "chr10", 9:16] <- 1.04
 dnacopy[loops$seqnames1 == "chr10", 17:24] <- 1.25
+
+dnacopy[loops$seqnames1 == "chr13" & loops$start >= 51000000, 1:8] <- 1.34
+dnacopy[loops$seqnames1 == "chr13" & loops$start >= 51000000, 9:16] <- 0.99
+dnacopy[loops$seqnames1 == "chr13" & loops$start >= 51000000, 17:24] <- 1.10
+
+dnacopy[loops$seqnames1 == "chr19" & loops$start >= 34000000, 1:8] <- 1.06
+dnacopy[loops$seqnames1 == "chr19" & loops$start >= 34000000, 9:16] <- 1.37
+dnacopy[loops$seqnames1 == "chr19" & loops$start >= 34000000, 17:24] <- 1.00
+
+dnacopy[loops$seqnames1 == "chr20", 1:8] <- 0.98
+dnacopy[loops$seqnames1 == "chr20", 9:16] <- 1.46
+dnacopy[loops$seqnames1 == "chr20", 17:24] <- 0.92
 
 
 # Create coldata
@@ -140,7 +178,7 @@ allSig = unique(unlist(sigList))
 length(allSig)
 
 
-# Add additional loop info to DF
+## Add additional loop info to DF -----
 # Loop IDs
 loops$name = rownames(resList$resAT)
 
@@ -160,7 +198,7 @@ loops$ATdiff = loops$name %in% sigList$resAT
 loops$ACdiff = loops$name %in% sigList$resAC
 loops$TCdiff = loops$name %in% sigList$resTC
 
-# Summary DESeq info
+## Summary DESeq info -----
 # Collect all LFC values
 lfc = data.frame(row.names=rownames(resList[[1]]))
 
@@ -189,44 +227,10 @@ loops = cbind(loops,
 diffLoops = loops[loops$name %in% allSig,]
 
 
-## PLOT: P-value hist -------
-dim(loops)
-dim(diffLoops)
-
-pdf(file="./output/loopProcessing/pvalue-hist.pdf", 
-    width=6, height=6)
-hist(loops$padj, 
-     breaks=seq(0,1,by=0.01),
-     col = rep(c("red", "grey"), 
-               times = c(sum(seq(0,1,by=0.01) <= p),
-                         sum(seq(0,1,by=0.01) > p))))
-dev.off()
-
-
-## PLOT: Loop length dist -------
-breakSize = 50000
-
-pdf(file="./output/loopProcessing/loopLengths.pdf", 
-    width=6, height=6)
-hist(loops$span[loops$span <= 2e6],
-     breaks = seq(0, 2e6, by = breakSize),
-     main = "",
-     xlab = "Loop lengths")
-hist(diffLoops$span[diffLoops$span <= 2e6],
-     breaks = seq(0, 2e6, by = breakSize),
-     col = "grey25",
-     add = T)
-legend("topright",
-       legend = c("all loops", "differential loops"),
-       fill = c("grey", "grey25"))
-dev.off()
-
-
-
 ## PLOT: Loop PCA -------
 sample.pal = c("steelblue", "orange", "firebrick")
 
-pdf(file="./output/loopProcessing/PCAplot.pdf", 
+pdf(file="./output/loopProcessing/FigS1D-PCAplot.pdf", 
     width=6, height=6)
 
 # Plot PCA of transformed counts
@@ -244,136 +248,221 @@ text(pc$x[,1], pc$x[,2],
 dev.off()
 
 
-## PLOT: Diff loop overlaps  -----
-library(UpSetR)
+## PLOT: Diff loop barplot -------
+diffLoopByComp = matrix(c(sum(loops$ATlfc[loops$ATdiff == T] > 0),
+                          sum(loops$ATlfc[loops$ATdiff == T] < 0),
+                          sum(loops$TClfc[loops$TCdiff == T] > 0),
+                          sum(loops$TClfc[loops$TCdiff == T] < 0),
+                          sum(loops$AClfc[loops$ACdiff == T] > 0),
+                          sum(loops$AClfc[loops$ACdiff == T] < 0)),
+                        ncol = 3, byrow = F)
+colnames(diffLoopByComp) = c("A vs T", "T vs C", "A vs C")
 
-pdf("./output/loopProcessing/diffLoopOverlaps.pdf",
-    width = 8, height = 8)
-dat = diffLoops[,c("MCF10_A", "MCF10_T", "MCF10_C")]
-dat = as.data.frame(do.call(cbind, lapply(dat, as.numeric)))
-upset(dat, 
-      sets.x.label = "Total diff loop #", 
-      mainbar.y.label = "Diff loops called")
-dev.off()
-
-
-
-
-## Read Info -----------
-pdf(file="./output/loopProcessing/readInfo.pdf", 
-    width=8, height=8)
-par(mfrow=c(2,2))
-
-### PLOT 1: Count boxplots for each sample (gene avg) ----
-boxplot(countMatrix, 
-        outline=F, 
-        xaxt='n', main="Counts per loop", 
-        col=rep(sample.pal, each=8))
-axis(side=1, las=2, at=1:24,
-     labels=gsub("_contact_map.hic", "", colnames(countMatrix)))
-
-### PLOT 2: Total summed counts for each sample ----
-bp = barplot(colSums(countMatrix),
-             xaxt='n', main="Summed counts per sample", 
-             col=rep(sample.pal, each=8))
-axis(side=1,las=2,at=bp,
-     labels=gsub("_contact_map.hic", "", colnames(countMatrix)))
-
-### PLOT 3: Histogram of total counts per loop ----
-hist(rowSums(countMatrix), 
-     main="Summed counts per loop", breaks=100)
-rug(rowSums(countMatrix))
-
-### PLOT 4: Histogram of total counts per gene for a single sample ----
-tmp=cbind(rowSums(countMatrix[,1:8]),
-          rowSums(countMatrix[,8:16]),
-          rowSums(countMatrix[,17:24]))
-bp = barplot(colSums(tmp), 
-             main="Summed counts per loop per sample", 
-             col=sample.pal)
-axis(side=1,las=1,at=bp,
-     labels=c("A", "T", "C"))
-
-### PAGE 2: Plot counts for each chromosome (to check for processing errors) ----
-par(mfrow=c(4,6))
-par(mar=rep(2, times=4))
-for (chr in c(paste0("chr", c(1:22, "X")))){
-  tmp = loops[loops$seqnames1 == chr, 27:50]
-  tmp=suppressWarnings(apply(tmp, 2, as.numeric))
-  barplot(colSums(tmp)/colSums(countMatrix), 
-          col=rep(sample.pal, each=8), main=chr)
-}
-par(mar=c(5,4,4,2))
-par(mfrow=c(1,1))
-
-dev.off()
-
-
-## PLOT: Check diff loops by chromosome  -----
-pdf("./output/loopProcessing/loopsByChrom.pdf",
-    width = 10, height = 6)
-par(mfrow=c(1,2))
-barplot(table(loops$seqnames1),
-        main = "Loops called by chromosome",
-        las = 2)
-barplot(table(diffLoops$maxLFCcomp, diffLoops$seqnames1),
-        col = c("white", "darkgrey", "grey40"),
-        main = "Differential loops by chromosome",
-        las = 2)
-legend("topright",
-       legend = c("A vs C", "A vs T", "T vs C"),
-       fill = c("white", "darkgrey", "grey40"),
-       title = "Max LFC Comparison",
+pdf("./output/loopProcessing/FigS2A-diffLoopByComp.pdf",
+    width = 6, height = 6)
+barplot(diffLoopByComp,
+        col = c("#6099B0", "#A0D1BC"),
+        border = NA,
+        main = "Number of differential loops")
+legend("topleft",
+       legend = c("Weakened", "Strengthened"),
+       text.col = c("#A0D1BC", "#6099B0"),
        bty = 'n')
 dev.off()
 
-par(mfrow=c(1,1))
 
-## PLOT: MA plots  -----
+## PLOT: Loop number by map -------
+n = rowSums(loops[,c("MCF10_A", "MCF10_T", "MCF10_C")])
+dat = c(rev(table(n[loops$MCF10_A])), 
+        rev(table(n[loops$MCF10_T])), 
+        rev(table(n[loops$MCF10_C])))
+dat = matrix(dat, ncol = 3, byrow = F)
 
-pdf("./output/loopProcessing/loopMA-byChrom.pdf",
-    width = 12, height = 12)
-par(mfrow=c(5,5))
-par(mar=c(2,2,3,3))
-for(c in unique(loops$seqnames1)){
-  dat = loops[loops$seqnames1 == c,]
-  plot(x = dat$avgCount, y = dat$ATlfc, pch = 19, col=alpha('black', .1),
-       main = c, ylim=c(-4,4))
-  abline(h=0)
-  points(x = dat$avgCount[dat$ATdiff == T],
-         y = dat$ATlfc[dat$ATdiff == T],
-         pch = 19, col = alpha("red", 0.1))
-}
-plot(x = loops$avgCount, y = loops$ATlfc, pch = 19, col=alpha('black', .1),
-     main = "A vs T", ylim=c(-4,4))
-abline(h=0)
-points(x = loops$avgCount[loops$ATdiff == T],
-       y = loops$ATlfc[loops$ATdiff == T],
-       pch = 19, col = alpha("red", 0.1))
-
-par(mfrow=c(5,5))
-for(c in unique(loops$seqnames1)){
-  dat = loops[loops$seqnames1 == c,]
-  plot(x = dat$avgCount, y = dat$AClfc, pch = 19, col=alpha('black', .1),
-       main = c, ylim=c(-4,4))
-  abline(h=0)
-  points(x = dat$avgCount[dat$ACdiff == T],
-         y = dat$AClfc[dat$ACdiff == T],
-         pch = 19, col = alpha("red", 0.1))
-}
-plot(x = loops$avgCount, y = loops$AClfc, pch = 19, col=alpha('black', .1),
-     main = "A vs C", ylim=c(-4,4))
-abline(h=0)
-points(x = loops$avgCount[loops$ACdiff == T],
-       y = loops$AClfc[loops$ACdiff == T],
-       pch = 19, col = alpha("red", 0.1))
+pdf(file="./output/loopProcessing/Fig1E-loopNumbers.pdf", 
+    width=8, height=8)
+barplot(dat,
+        border = NA,
+        names.arg = c("MCF10A", "MCF10AT1", "MCF10CA1a"),
+        las = 1,
+        yaxt = 'n',
+        col = rev(brewer.pal(n = 5, "YlGnBu"))[2:4],
+        main = paste0(nrow(loops), " Unique\nChromatin Loops"))
+axis(side = 2, at = seq(0, 30e3, 5e3), las = 2, 
+     xpd = T, lwd = 0, line = -0.8)
+abline(h = seq(0, 30e3, 5e3), col = "grey")
 dev.off()
 
 
 
-## OUTPUT  -----
-# save(loops, countMatrix, dds, dds.trans, diffLoops, allSig,
-#      file = "./output/loopProcessing/MCF10_processedLoops-comprehensive.rda")
+# CLUSTERING     ------------------------------------------------------
 
-save(loops, countMatrix, dds, dds.trans, diffLoops, allSig,
-     file = "./output/loopProcessing/MCF10_processedLoops-conservative.rda")
+# Cluster settings
+k = 4
+k.pal = brewer.pal(n=4, "Spectral")
+
+# Function for combining replicate columns
+combineReps <- function(matrix, new.colnames)
+{
+  newMatrix = c()
+  for (i in c(1, 9, 17))
+  {
+    tempMatrix = matrix[,i:(i+7)]
+    newCol = apply(tempMatrix,1,mean)
+    newMatrix  = cbind(newMatrix,newCol)
+  }
+  rownames(newMatrix) = rownames(matrix)
+  
+  if(!is.null(new.colnames)){
+    colnames(newMatrix) = new.colnames
+  }
+  
+  return(newMatrix)
+}
+
+
+## Normalize
+# Build a matrix of transformed loop counts
+countMat = assay(dds.trans)
+
+# Center and scale data
+countMat.norm <- (countMat - rowMeans(countMat))/rowSds(countMat + .5)
+
+# Subset for significant loops
+countMatSig.norm <- countMat.norm[which(rownames(countMat.norm) %in% allSig),]
+
+# Combine replicates
+countMat.combo <- combineReps(countMat, 
+                              new.colnames=c("A", "T", "C"))
+countMat.norm.combo <- combineReps(countMat.norm, 
+                                   new.colnames=c("A", "T", "C"))
+countMatSig.norm.combo <- combineReps(countMatSig.norm, 
+                                      new.colnames=c("A", "T", "C"))
+
+## Cluster
+# Set seed to preserve manual ordering
+seed = 32
+set.seed(seed)
+
+# Perform clustering
+clust = kmeans(countMatSig.norm, centers=k)
+cut = clust$cluster
+
+# Order clusters
+clusterOrder = c(3, 2, 4, 1) 
+names(clusterOrder) = c("up.early", "up.late", 
+                        "down.early", "down.late")
+
+
+
+## PLOT: Line Plots -----------
+# pdf("./figs/MCF10analysis/prelimLoops/MCF10_clusters/clusterLinePlots.pdf", 
+#     width=9, height=6)
+pdf("./output/loopProcessing/Fig1H-clusterLines.pdf", 
+    width=3, height=12)
+
+# Plot each cluster
+par(mar=c(3,3,3,3))
+par(mfrow=c(2,ceiling(k/2)))
+par(mfrow=c(4, 1))
+
+n=0
+for (i in clusterOrder) {
+  n=n+1
+  
+  # grab data
+  dat = countMatSig.norm.combo[cut == i,]
+  
+  # make empty plot
+  plot(x=1:3, 
+       y=colMeans(countMatSig.norm.combo[cut==i,]), 
+       type="n",
+       main=paste(names(clusterOrder)[n],"\nn=",table(cut)[i],sep=""),
+       ylim=c(-1,1), 
+       xaxt="n", 
+       xlab="Cancer progression", 
+       ylab="Relative loop strength", 
+       bty = 'n', las = 2)
+  
+  # add fill (std dev)
+  polygon(c(1:3, 3:1), 
+          c(colMeans(dat)-colSds(dat), 
+            rev(colMeans(dat)+colSds(dat))), 
+          col=lighten(k.pal[n], amount=.85), border=NA)
+  
+  # and transparent grey lines
+  #apply(countMatSig.norm.combo[cut==i,],1,lines,col=adjustcolor("grey",alpha.f=0.4), x=c(0, .25, .5, .75, 1,2,3,4))
+  abline(h=0, col=alpha("black", .2))
+  
+  # add median line
+  lines(x=1:3,
+        y=colMeans(countMatSig.norm.combo[cut==i,]),
+        col=k.pal[n],
+        lwd=2)
+  
+  # add axis
+  axis(1, at=1:3, 
+       labels=c("A", "T", "C"))
+}
+
+dev.off()
+
+
+
+## PLOT: Heatmap -----------
+
+# Plot heatmap of k clusters 
+png(filename="./output/loopProcessing/Fig1H-clusterHeatmap.png",
+    width=4, height=8, units="in", res=300)
+
+# Plot heatmap
+par(mfrow=c(1,1))
+par(mar=c(5,5,5,5))
+
+pheatmap(countMatSig.norm.combo[order(match(cut, clusterOrder)),], 
+         cluster_rows = F, show_rownames = F,
+         cluster_cols = F,
+         annotation_row = data.frame(cluster = match(cut, clusterOrder)[order(match(cut, clusterOrder))],
+                                     row.names = rownames(countMatSig.norm.combo[order(match(cut, clusterOrder)),])),
+         annotation_colors = list(cluster = k.pal),
+         annotation_legend = F,
+         labels_col = c("MCF10A", "MCF10AT1", "MCF10CA1a"),
+         angle_col = 0)
+
+
+dev.off()
+
+
+## TABLE: Loop info -----------
+loops = cbind(loops,
+              data.frame(
+                cluster = cut[match(x=rownames(countMat.norm.combo),
+                                    table=names(cut))],
+                A_ZSCR = countMat.norm.combo[,1],
+                T_ZSCR = countMat.norm.combo[,2],
+                C_ZSCR = countMat.norm.combo[,3],
+                max_ZSCR = rowMaxs(countMat.norm.combo),
+                A_VST = countMat.combo[,1],
+                T_VST = countMat.combo[,2],
+                C_VST = countMat.combo[,3]))
+
+# Change name of cluster to descriptive name
+loops$cluster[which(is.na(loops$cluster) == TRUE)] = "static"
+for (i in 1:k){
+  loops$cluster[which(loops$cluster == clusterOrder[i])] = names(clusterOrder[i])
+}
+
+# Save to table
+write.table(x = loops,
+            file = "./output/loopProcessing/TableS2-loops.txt",
+            sep = "\t", quote = F, row.names = F, col.names = T)
+
+
+# OUTPUT      -----------------------------------------------------------------------------
+saveRDS(loops, 
+        file="./output/loopProcessing/loops.rds")
+
+save(countMatrix, 
+     countMat.combo, countMat.norm.combo, countMatSig.norm.combo, 
+     cut, clusterOrder,
+     dds, dds.trans, diffLoops, allSig,
+     file = "./output/loopProcessing/loopData.rda")
