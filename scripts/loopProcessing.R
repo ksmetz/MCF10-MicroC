@@ -426,7 +426,7 @@ pheatmap(countMatSig.norm.combo[order(match(cut, clusterOrder)),],
          annotation_colors = list(cluster = k.pal),
          annotation_legend = F,
          labels_col = c("MCF10A", "MCF10AT1", "MCF10CA1a"),
-         angle_col = 0)
+         angle_col = "0")
 
 
 dev.off()
@@ -450,6 +450,12 @@ loops$cluster[which(is.na(loops$cluster) == TRUE)] = "static"
 for (i in 1:k){
   loops$cluster[which(loops$cluster == clusterOrder[i])] = names(clusterOrder[i])
 }
+
+## 53.8% of diff loops weakened
+sum(table(loops$cluster)[1:2])/sum(loops$cluster != "static")
+
+## 46.2% of diff loops strengthened
+sum(table(loops$cluster)[4:5])/sum(loops$cluster != "static")
 
 # Save to table
 write.table(x = loops,

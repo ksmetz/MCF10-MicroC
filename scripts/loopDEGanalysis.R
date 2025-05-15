@@ -117,14 +117,16 @@ pdf("./output/loopDEGanalysis/FigS5BC-loopedDEGdirEnrich.pdf",
     width = 4, height = 4)
 
 ### Upregulated genes in gained loops -----
-focus = genes[genes$AC.log2FoldChange > 0 & genes$AC.sig,]
-obs = ACloopDEGs[ACloopDEGs$AC.log2FoldChange > 0 & ACloopDEGs$AClfc > 0,]
-pool = proms[expressed,]
-pool = pool[!pool$AC.sig]
+focus = genes[genes$AC.log2FoldChange > 0 & genes$AC.sig,] ## Upregulated genes
+obs = ACloopDEGs[ACloopDEGs$AC.log2FoldChange > 0 & ACloopDEGs$AClfc > 0,] ## Upreg genes in gained loops
+pool = proms[expressed,] ## Expressed genes
+pool = pool[!pool$AC.sig] ## Expressed genes not differential at A v C
 
-exp = lapply(1:100, function(n){
+exp = lapply(1:1000, function(n){
+  ## Random sample of genes (equal in number to # of upregulated genes)
   rand = pool[sample(1:length(pool), size = length(focus)),]
   
+  ## How many genes overlap with gained loops
   ov = findOverlaps(query = loops,
                     subject = rand, 
                     maxgap = gap)
@@ -136,6 +138,7 @@ plot(density(unlist(exp)), xlim=c(0, 150),
      main = "Upregulated genes in gained loops")
 abline(v = length(obs), col = "red")
 
+length(focus)
 median(unlist(exp), na.rm=T)
 length(obs)
 
@@ -143,7 +146,7 @@ length(obs)
 focus = genes[genes$AC.log2FoldChange < 0 & genes$AC.sig,]
 obs = ACloopDEGs[ACloopDEGs$AC.log2FoldChange < 0 & ACloopDEGs$AClfc < 0,]
 
-exp = lapply(1:100, function(n){
+exp = lapply(1:1000, function(n){
   rand = pool[sample(1:length(pool), size = length(focus)),]
   
   ov = findOverlaps(query = loops,
@@ -157,10 +160,23 @@ plot(density(unlist(exp)), xlim=c(0, 150),
      main = "Downregulated genes in lost loops")
 abline(v = length(obs), col = "red")
 
+length(focus)
 median(unlist(exp), na.rm=T)
 length(obs)
 
 dev.off()
+
+
+## Total unique genes -------
+loopedUp = c(ACloopDEGs[ACloopDEGs$AC.log2FoldChange > 0 & ACloopDEGs$AClfc > 0,],
+             ATloopDEGs[ATloopDEGs$AT.log2FoldChange > 0 & ATloopDEGs$ATlfc > 0,],
+             TCloopDEGs[TCloopDEGs$TC.log2FoldChange > 0 & TCloopDEGs$TClfc > 0,])
+length(unique(loopedUp$GENEID))
+
+loopedDn = c(ACloopDEGs[ACloopDEGs$AC.log2FoldChange < 0 & ACloopDEGs$AClfc < 0,],
+             ATloopDEGs[ATloopDEGs$AT.log2FoldChange < 0 & ATloopDEGs$ATlfc < 0,],
+             TCloopDEGs[TCloopDEGs$TC.log2FoldChange < 0 & TCloopDEGs$TClfc < 0,])
+length(unique(loopedDn$GENEID))
 
 
 # GO ENRICHMENT ----------------
@@ -438,6 +454,50 @@ lollipopPlot(input = ACloopDEGs,
 dev.off()
 
 
+## Number of corresponding changes per comparison -------
+lollipopStats = function(input, loopFCcol, geneFCcol){
+  gLFC = mcols(input)[,geneFCcol]
+  gLFCsumm = split(gLFC, input$SYMBOL)
+  gLFCsumm = lapply(gLFCsumm, mean)
+  
+  lLFC = mcols(input)[,loopFCcol]
+  lLFCsumm = split(lLFC, input$SYMBOL)
+  
+  o = order(unlist(gLFCsumm), decreasing = T)
+  
+  tmp = (unlist(Map(function(G, L){
+    any(sign(unlist(G)) == sign(unlist(L)))
+  }, G = gLFCsumm[o], L = lLFCsumm[o])))
+  
+  return(tmp)
+  
+}
+
+## Upregulated in A vs T/C
+AvT = lollipopStats(input = ATloopDEGs[ATloopDEGs$AT.log2FoldChange < 0,], 
+                    loopFCcol = "ATlfc",geneFCcol = "AT.log2FoldChange")
+sum(AvT)/length(AvT)
+AvC = lollipopStats(input = ACloopDEGs[ACloopDEGs$AC.log2FoldChange < 0,], 
+                    loopFCcol = "AClfc",geneFCcol = "AC.log2FoldChange")
+sum(AvC)/length(AvC)
+
+## Upregulated in T vs A/C
+TvA = lollipopStats(input = ATloopDEGs[ATloopDEGs$AT.log2FoldChange > 0,], 
+                    loopFCcol = "ATlfc",geneFCcol = "AT.log2FoldChange")
+sum(TvA)/length(TvA)
+TvC = lollipopStats(input = TCloopDEGs[TCloopDEGs$TC.log2FoldChange < 0,], 
+                    loopFCcol = "TClfc",geneFCcol = "TC.log2FoldChange")
+sum(TvC)/length(TvC)
+
+## Upregulated in C vs A/T
+CvA = lollipopStats(input = ACloopDEGs[ACloopDEGs$AC.log2FoldChange > 0,], 
+                    loopFCcol = "AClfc",geneFCcol = "AC.log2FoldChange")
+sum(CvA)/length(CvA)
+CvT = lollipopStats(input = TCloopDEGs[TCloopDEGs$TC.log2FoldChange > 0,], 
+                    loopFCcol = "TClfc",geneFCcol = "TC.log2FoldChange")
+sum(CvT)/length(CvT)
+
+
 ## Same vs Opp LFC boxplots ----------
 lfcBoxplot <- function(input1, input2, title=""){
   par(mfrow=c(1,1))
@@ -518,7 +578,7 @@ lfcBoxplot <- function(input1, input2, title=""){
               "loop" = t.test(dat1$loop, dat2$loop)))
 }
 
-## PLOT: Looped-DEG feature boxplots -------
+### PLOT: Looped-DEG feature boxplots -------
 pdf("./output/loopDEGanalysis/Fig5DE-loopedDEGfeatureBoxplots.pdf",
     width = 12, height = 6)
 
@@ -537,5 +597,210 @@ oppLost = geneLoops[geneLoops$AC.sig & geneLoops$ACdiff &
                       geneLoops$AC.log2FoldChange < 0 &
                       geneLoops$AClfc > 0,]
 lfcBoxplot(input1 = bothLost, input2 = oppLost)
+
+dev.off()
+
+## Other combinations 
+lfcBoxplotAT <- function(input1, input2, title=""){
+  par(mfrow=c(1,1))
+  ov = findOverlaps(query = input1,
+                    subject = enh)
+  loopEnh = unique(enh[subjectHits(ov),])
+  
+  ov = findOverlaps(query = loopEnh,
+                    subject = promoters(genes[genes$SYMBOL %in% input1$SYMBOL],
+                                        upstream = 10000,
+                                        downstream = 5000))
+  enhK27 = unique(loopEnh[-(queryHits(ov)),])
+  proK27 = unique(loopEnh[queryHits(ov),])
+  
+  ov = findOverlaps(query = input1,
+                    subject = repr)
+  k27me3 = unique(repr[subjectHits(ov),])
+  
+  dat1 = list("repr" = k27me3$AT.log2FoldChange,
+              "enh" = enhK27$AT.log2FoldChange,
+              "pro" = proK27$AT.log2FoldChange,
+              "gene" = input1$AT.log2FoldChange,
+              "loop" = input1$ATlfc)
+  
+  
+  ov = findOverlaps(query = input2,
+                    subject = enh)
+  loopEnh = unique(enh[subjectHits(ov),])
+  
+  ov = findOverlaps(query = loopEnh,
+                    subject = promoters(genes[genes$SYMBOL %in% input2$SYMBOL],
+                                        upstream = 10000,
+                                        downstream = 5000))
+  enhK27 = unique(loopEnh[-(queryHits(ov)),])
+  proK27 = unique(loopEnh[queryHits(ov),])
+  
+  ov = findOverlaps(query = input2,
+                    subject = repr)
+  k27me3 = unique(repr[subjectHits(ov),])
+  
+  dat2 = list("repr" = k27me3$AT.log2FoldChange,
+              "enh" = enhK27$AT.log2FoldChange,
+              "pro" = proK27$AT.log2FoldChange,
+              "gene" = input2$AT.log2FoldChange,
+              "loop" = input2$ATlfc)
+  
+  dat = list(dat1$repr, dat2$repr,
+             dat1$enh, dat2$enh,
+             dat1$pro, dat2$pro,
+             dat1$gene, dat2$gene,
+             dat1$loop, dat2$loop)
+  
+  boxplot(dat,
+          col = alpha(rep(c("grey", "firebrick", "orange", "gold", "steelblue"), each = 2),
+                      rep(c(0.75, 0.25), times = 5)),
+          outline = F,
+          # ylim = c(-1, 10),
+          main = title)
+  stripchart(dat,
+             col = alpha(rep(c("grey", "firebrick", "orange", "gold", "steelblue"), each = 2),
+                         rep(c(0.5, 0.25), times = 5)),
+             vertical = T, 
+             method = "jitter",
+             jitter = 0.25,
+             pch = 19,
+             add = T)
+  
+  boxplot(dat,
+          col = NA,
+          outline = F,
+          add = T)
+  abline(h=0)
+  
+  return(list("repr" = t.test(dat1$repr, dat2$repr),
+              "enh"  = t.test(dat1$enh, dat2$enh),
+              "pro"  = t.test(dat1$pro, dat2$pro),
+              "gene" = t.test(dat1$gene, dat2$gene),
+              "loop" = t.test(dat1$loop, dat2$loop)))
+}
+
+### PLOT: Looped-DEG feature boxplots (AvT) -------
+pdf("./output/loopDEGanalysis/FigS5D-loopedDEGfeatureBoxplotsAvT.pdf",
+    width = 12, height = 6)
+
+bothGained = geneLoops[geneLoops$AT.sig & geneLoops$ATdiff &
+                         geneLoops$AT.log2FoldChange > 0 &
+                         geneLoops$ATlfc > 0,]
+oppGained = geneLoops[geneLoops$AT.sig & geneLoops$ATdiff &
+                        geneLoops$AT.log2FoldChange > 0 &
+                        geneLoops$ATlfc < 0,]
+lfcBoxplotAT(input1 = bothGained, input2 = oppGained)
+
+bothLost = geneLoops[geneLoops$AT.sig & geneLoops$ATdiff &
+                       geneLoops$AT.log2FoldChange < 0 &
+                       geneLoops$ATlfc < 0,]
+oppLost = geneLoops[geneLoops$AT.sig & geneLoops$ATdiff &
+                      geneLoops$AT.log2FoldChange < 0 &
+                      geneLoops$ATlfc > 0,]
+lfcBoxplotAT(input1 = bothLost, input2 = oppLost)
+
+dev.off()
+
+
+lfcBoxplotTC <- function(input1, input2, title=""){
+  par(mfrow=c(1,1))
+  ov = findOverlaps(query = input1,
+                    subject = enh)
+  loopEnh = unique(enh[subjectHits(ov),])
+  
+  ov = findOverlaps(query = loopEnh,
+                    subject = promoters(genes[genes$SYMBOL %in% input1$SYMBOL],
+                                        upstream = 10000,
+                                        downstream = 5000))
+  enhK27 = unique(loopEnh[-(queryHits(ov)),])
+  proK27 = unique(loopEnh[queryHits(ov),])
+  
+  ov = findOverlaps(query = input1,
+                    subject = repr)
+  k27me3 = unique(repr[subjectHits(ov),])
+  
+  dat1 = list("repr" = k27me3$TC.log2FoldChange,
+              "enh" = enhK27$TC.log2FoldChange,
+              "pro" = proK27$TC.log2FoldChange,
+              "gene" = input1$TC.log2FoldChange,
+              "loop" = input1$TClfc)
+  
+  
+  ov = findOverlaps(query = input2,
+                    subject = enh)
+  loopEnh = unique(enh[subjectHits(ov),])
+  
+  ov = findOverlaps(query = loopEnh,
+                    subject = promoters(genes[genes$SYMBOL %in% input2$SYMBOL],
+                                        upstream = 10000,
+                                        downstream = 5000))
+  enhK27 = unique(loopEnh[-(queryHits(ov)),])
+  proK27 = unique(loopEnh[queryHits(ov),])
+  
+  ov = findOverlaps(query = input2,
+                    subject = repr)
+  k27me3 = unique(repr[subjectHits(ov),])
+  
+  dat2 = list("repr" = k27me3$TC.log2FoldChange,
+              "enh" = enhK27$TC.log2FoldChange,
+              "pro" = proK27$TC.log2FoldChange,
+              "gene" = input2$TC.log2FoldChange,
+              "loop" = input2$TClfc)
+  
+  dat = list(dat1$repr, dat2$repr,
+             dat1$enh, dat2$enh,
+             dat1$pro, dat2$pro,
+             dat1$gene, dat2$gene,
+             dat1$loop, dat2$loop)
+  
+  boxplot(dat,
+          col = alpha(rep(c("grey", "firebrick", "orange", "gold", "steelblue"), each = 2),
+                      rep(c(0.75, 0.25), times = 5)),
+          outline = F,
+          # ylim = c(-1, 10),
+          main = title)
+  stripchart(dat,
+             col = alpha(rep(c("grey", "firebrick", "orange", "gold", "steelblue"), each = 2),
+                         rep(c(0.5, 0.25), times = 5)),
+             vertical = T, 
+             method = "jitter",
+             jitter = 0.25,
+             pch = 19,
+             add = T)
+  
+  boxplot(dat,
+          col = NA,
+          outline = F,
+          add = T)
+  abline(h=0)
+  
+  return(list("repr" = t.test(dat1$repr, dat2$repr),
+              "enh"  = t.test(dat1$enh, dat2$enh),
+              "pro"  = t.test(dat1$pro, dat2$pro),
+              "gene" = t.test(dat1$gene, dat2$gene),
+              "loop" = t.test(dat1$loop, dat2$loop)))
+}
+
+
+### PLOT: Looped-DEG feature boxplots (TvC) -------
+pdf("./output/loopDEGanalysis/FigS5E-loopedDEGfeatureBoxplotsTvC.pdf",
+    width = 12, height = 6)
+
+bothGained = geneLoops[geneLoops$TC.sig & geneLoops$TCdiff &
+                         geneLoops$TC.log2FoldChange > 0 &
+                         geneLoops$TClfc > 0,]
+oppGained = geneLoops[geneLoops$TC.sig & geneLoops$TCdiff &
+                        geneLoops$TC.log2FoldChange > 0 &
+                        geneLoops$TClfc < 0,]
+lfcBoxplotTC(input1 = bothGained, input2 = oppGained)
+
+bothLost = geneLoops[geneLoops$TC.sig & geneLoops$TCdiff &
+                       geneLoops$TC.log2FoldChange < 0 &
+                       geneLoops$TClfc < 0,]
+oppLost = geneLoops[geneLoops$TC.sig & geneLoops$TCdiff &
+                      geneLoops$TC.log2FoldChange < 0 &
+                      geneLoops$TClfc > 0,]
+lfcBoxplotTC(input1 = bothLost, input2 = oppLost)
 
 dev.off()

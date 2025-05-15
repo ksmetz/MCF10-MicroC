@@ -399,7 +399,7 @@ for(n in 1:length(plotWindows)){
                chromend = wEnd,
                width = plotW,
                x = pageB,
-               norm = "SCALE",
+               norm = "KR",
                resolution = 5000)
   
   ### Make page -------

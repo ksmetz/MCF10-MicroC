@@ -36,6 +36,14 @@ TCctcf = read.table("./input/ctcf/csaw/CTCF_csaw_DB_results_TvsC.txt",
 
 
 # CTCF OVERLAP -----------------------
+
+## Anchor overlap: 77.6% of anchors overlap CTCF peaks
+ov = countOverlaps(query = regions(loops),
+                   subject = ctcf, 
+                   maxgap = 10000)
+sum(ov >= 1)/length(ov)
+
+## Loop overlap: 72.4% of loops have double overlap, 95.0% have single overlap
 Lov = countOverlaps(query = loops,
                     subject = ctcf, 
                     maxgap = 10000,
@@ -71,6 +79,7 @@ dev.off()
 
 
 ## CTCF-dependent trends ----------
+diffLoops = loops[loops$cluster != "static",]
 Lov = countOverlaps(query = diffLoops,
                     subject = ctcf, 
                     maxgap = 10000,
@@ -111,7 +120,6 @@ dev.off()
 
 
 # DIFF LOOP CTCF ----------
-diffLoops = loops[loops$cluster != "static",]
 
 ## Identify CTCF sites that change in the same or opposite direction as differential loops
 ctcfClass <- function(csawOutput, loopSet, LFCcol){

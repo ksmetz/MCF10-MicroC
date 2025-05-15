@@ -45,6 +45,10 @@ nonLoopedGenes = genes[expressed,][-unique(subjectHits(ov)),]
 
 
 # DEG ENRICHMENT ---------
+## % expressed genes in differential loops  -----
+# 507 (2.95%) of genes are in differential loops
+length(unique(geneDiffLoops$GENEID))/sum(expressed)
+
 ## % differential genes in loops ---------
 ## 49% of all genes in loops are DEG vs 65% of genes in diff loops
 genesInLoops = (unique(geneLoops$GENEID))

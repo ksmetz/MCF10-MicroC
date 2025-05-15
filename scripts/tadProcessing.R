@@ -479,17 +479,18 @@ pheatmap(normSig[order(match(cut, cluster.order)),],
                                      row.names = rownames(normSig[order(match(cut, cluster.order)),])),
          annotation_colors = list(cluster = k.pal),
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100),
-         annotation_legend = F)
+         annotation_legend = F,
+         angle_col = "0")
+
 dev.off()
 
 ## Diff TADs --------------
 ## Find TADs with 1 or 2 diff boundaries
 diffTadBounds = GRanges(tadBoundDiffInfo[tadBoundDiffInfo$sig,])
 boundaryOverlaps = findOverlaps(query = mergedTads,
-                                subject = diffTadBounds,
-                                maxgap = 50000)
+                                subject = diffTadBounds)
 
-# 46.1% of TADs have at least 1 diff boundary 
+## 38.4% (5,084) of TADs have at least 1 diff boundary 
 hits = unique(queryHits(boundaryOverlaps)) 
 length(hits)/length(mergedTads) 
 length(hits)
@@ -519,6 +520,11 @@ write.table(x = tadBounds,
             file = "./output/tadProcessing/TableS3-TADbounds.txt",
             sep = "\t", quote = F, row.names = F, col.names = T)
 
+## 28.8% of bounds lose IS (strengthened boundary)
+sum(table(tadBounds$cluster)[1:2])/sum(tadBounds$cluster != "static")
+
+## 71.2 of bounds lose IS (weakened boundary)
+sum(table(tadBounds$cluster)[4:5])/sum(tadBounds$cluster != "static")
 
 ## TABLE: TAD info -----------
 write.table(x = as.data.frame(mergedTads)[,1:13],

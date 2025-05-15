@@ -28,7 +28,7 @@ rep = GRanges(readRDS("./output/H3K27me3Processing/repressors.rds"))
 
 ## Find expressed genes -----
 smallestGroupSize <- 3
-cutoff = 100
+cutoff = 100 # cutoff of 10 = 17,185 expressed genes
 expressed <- rowSums(as.matrix(mcols(genes)[,21:29]) >= cutoff) >= smallestGroupSize
 sum(expressed) # 12,666 out of 60,660
 
