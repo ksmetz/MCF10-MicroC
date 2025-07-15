@@ -4,6 +4,8 @@ library(GenomicRanges)
 library(mariner)
 library(matrixStats)
 library(rtracklayer)
+library(InteractionSet)
+library(scales)
 
 
 # READ IN -----------------------
@@ -59,16 +61,17 @@ EEloops = EEloops[!(EEloops %in% PPloops)]
 EEloops = EEloops[!(EEloops %in% EPloops)]
 
 ## Single-feature anchors -------
+PXloops = unique(c(queryHits(ov1)[-(queryHits(ov1) %in% queryHits(ov2))],
+                   queryHits(ov2)[-(queryHits(ov2) %in% queryHits(ov1))]))
+PXloops = PXloops[!(PXloops %in% PPloops)]
+PXloops = PXloops[!(PXloops %in% EPloops)]
+
 EXloops = unique(c(queryHits(ov3)[-(queryHits(ov3) %in% queryHits(ov4))],
                    queryHits(ov4)[-(queryHits(ov4) %in% queryHits(ov3))]))
 EXloops = EXloops[!(EXloops %in% PPloops)]
 EXloops = EXloops[!(EXloops %in% EPloops)]
 EXloops = EXloops[!(EXloops %in% EEloops)]
-
-PXloops = unique(c(queryHits(ov1)[-(queryHits(ov1) %in% queryHits(ov2))],
-                   queryHits(ov2)[-(queryHits(ov2) %in% queryHits(ov1))]))
-PXloops = PXloops[!(PXloops %in% PPloops)]
-PXloops = PXloops[!(PXloops %in% EPloops)]
+EXloops = EXloops[!(EXloops %in% PXloops)]
 
 ## PLOT: EP pie chart -------
 dat = rep("none", length(loops))
@@ -474,3 +477,14 @@ dnregStats = lfcBoxplot(loopInput = downStatic, title = "Downregulated genes")
 
 dev.off()
 
+
+
+# OUTPUT ---------------
+EPstatus = rep("none", length(loops))
+EPstatus[PPloops] = "PP"
+EPstatus[EPloops] = "EP"
+EPstatus[EEloops] = "EE"
+EPstatus[EXloops] = "E"
+EPstatus[PXloops] = "P"
+
+saveRDS(EPstatus, file = "./output/enhancerPromoterLoops/loop-EPstatus.rds")
